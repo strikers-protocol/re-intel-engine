@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GHOST SIGNAL — STRIKERS_PROTOCOL</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#060810;color:#e2e8f0;font-family:'Inter',sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(6,182,212,0.25);border-radius:4px}
+body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,0.03) 0px,rgba(0,0,0,0.03) 1px,transparent 1px,transparent 4px);pointer-events:none;z-index:9999}
+
+/* ── LOADING SCREEN ── */
+#ls{position:fixed;inset:0;background:#060810;z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px}
+#ls.hidden{display:none}
+#ls-canvas{position:absolute;inset:0;width:100%;height:100%}
+.ls-ui{position:relative;z-index:2;text-align:center;pointer-events:none;width:100%;max-width:400px;padding:0 20px}
+.ls-label{font-family:'DM Mono',monospace;font-size:9px;color:rgba(6,182,212,0.4);letter-spacing:3px;margin-bottom:10px}
+.ls-main{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:#e2e8f0;letter-spacing:1px;margin-bottom:6px;min-height:26px}
+.ls-status{font-family:'DM Mono',monospace;font-size:10px;color:#06b6d4;letter-spacing:0.5px;margin-bottom:14px;min-height:16px;opacity:0.8}
+.ls-bar-wrap{width:100%;height:2px;background:rgba(6,182,212,0.08);border-radius:2px;margin-bottom:14px;overflow:hidden}
+.ls-bar{height:100%;background:linear-gradient(90deg,#0891b2,#06b6d4,#67e8f9);border-radius:2px;width:0%;transition:width 0.25s;box-shadow:0 0 8px #06b6d4}
+.ls-stats{display:flex;gap:32px;justify-content:center}
+.ls-stat-val{font-family:'DM Mono',monospace;font-size:15px;color:#06b6d4;font-weight:500}
+.ls-stat-lbl{font-family:'DM Mono',monospace;font-size:8px;color:rgba(6,182,212,0.3);letter-spacing:2px;margin-top:2px}
+
+/* ── TOPBAR ── */
+#topbar{background:rgba(4,6,14,0.98);border-bottom:1px solid rgba(6,182,212,0.1);padding:0 24px;height:50px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.logo-ring{width:30px;height:30px;border:1.5px solid rgba(6,182,212,0.45);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#06b6d4;font-family:'DM Mono',monospace;font-weight:500;position:relative}
+.logo-ring::before{content:"";position:absolute;width:36px;height:36px;border:1px solid rgba(6,182,212,0.12);border-radius:50%;animation:ringPulse 2.5s ease infinite}
+@keyframes ringPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:0}}
+.logo-txt{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#e2e8f0;letter-spacing:0.5px}
+.logo-txt span{color:#06b6d4}
+.dv{width:1px;height:18px;background:rgba(255,255,255,0.07)}
+.tb-sub{font-family:'DM Mono',monospace;font-size:9px;color:#1e3340;letter-spacing:2px}
+.tb-right{margin-left:auto;display:flex;gap:10px;align-items:center}
+.signal-dot{width:6px;height:6px;border-radius:50%;background:#06b6d4;box-shadow:0 0 6px #06b6d4;animation:sdot 2s ease infinite;display:none}
+@keyframes sdot{0%,100%{opacity:1}50%{opacity:0.3}}
+.signal-dot.show{display:block}
+.tb-badge{font-family:'DM Mono',monospace;font-size:9px;padding:3px 10px;border-radius:3px;letter-spacing:1px;display:none}
+.tb-badge.show{display:inline}
+.threat-C{background:rgba(220,38,38,0.15);color:#f87171;border:1px solid rgba(220,38,38,0.25)}
+.threat-H{background:rgba(234,88,12,0.15);color:#fb923c;border:1px solid rgba(234,88,12,0.25)}
+.threat-M{background:rgba(202,138,4,0.12);color:#facc15;border:1px solid rgba(202,138,4,0.2)}
+.threat-L{background:rgba(22,163,74,0.1);color:#4ade80;border:1px solid rgba(22,163,74,0.15)}
+.threat-N{background:rgba(6,182,212,0.08);color:#67e8f9;border:1px solid rgba(6,182,212,0.2)}
+.tb-chip{font-family:'DM Mono',monospace;font-size:9px;color:rgba(6,182,212,0.45);border:1px solid rgba(6,182,212,0.1);padding:3px 10px;border-radius:3px;display:none}
+.tb-chip.show{display:inline}
+.btn-tb{background:transparent;border:1px solid rgba(255,255,255,0.07);border-radius:4px;padding:5px 12px;color:#334155;font-size:10px;cursor:pointer;font-family:'DM Mono',monospace;transition:all 0.18s;letter-spacing:0.5px;display:none}
+.btn-tb:hover{border-color:rgba(6,182,212,0.3);color:#06b6d4}
+.btn-tb.show{display:inline-flex}
+
+/* ── AUTH ── */
+#auth-page{display:none;min-height:calc(100vh - 50px);align-items:center;justify-content:center;padding:20px;position:relative}
+#auth-page.show{display:flex}
+#auth-page::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 70% 50%,rgba(6,182,212,0.04) 0%,transparent 60%);pointer-events:none}
+.auth-card{width:100%;max-width:380px;background:rgba(4,8,16,0.97);border:1px solid rgba(6,182,212,0.12);border-radius:10px;padding:32px;position:relative}
+.auth-card::before{content:"";position:absolute;top:-1px;left:20%;right:20%;height:1px;background:linear-gradient(90deg,transparent,#06b6d4,transparent)}
+.auth-hdr{text-align:center;margin-bottom:28px}
+.auth-radar{width:52px;height:52px;border:1.5px solid rgba(6,182,212,0.35);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;position:relative}
+.auth-radar::after{content:"";position:absolute;top:4px;left:50%;width:50%;height:1.5px;background:linear-gradient(90deg,#06b6d4,transparent);transform-origin:left;animation:sweep 3s linear infinite}
+@keyframes sweep{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.auth-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#e2e8f0;margin-bottom:4px}
+.auth-sub{font-family:'DM Mono',monospace;font-size:9px;color:#1e3340;letter-spacing:2px}
+.auth-tabs{display:flex;border:1px solid rgba(255,255,255,0.06);border-radius:6px;overflow:hidden;margin-bottom:22px}
+.auth-tab{flex:1;padding:8px;text-align:center;cursor:pointer;font-family:'DM Mono',monospace;font-size:10px;color:#1e3340;transition:all 0.18s;letter-spacing:1px}
+.auth-tab.active{background:rgba(6,182,212,0.08);color:#06b6d4;border-bottom:1.5px solid #06b6d4}
+.fld-lbl{font-family:'DM Mono',monospace;font-size:9px;color:rgba(6,182,212,0.45);letter-spacing:1.5px;margin-bottom:6px;text-transform:uppercase}
+input[type=text],input[type=email],input[type=password]{width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.07);border-radius:6px;color:#e2e8f0;padding:10px 14px;font-size:13px;font-family:'DM Mono',monospace;outline:none;transition:border-color 0.2s;caret-color:#06b6d4;margin-bottom:14px}
+input:focus{border-color:rgba(6,182,212,0.35);box-shadow:0 0 0 3px rgba(6,182,212,0.04)}
+.btn-auth{width:100%;padding:12px;background:rgba(6,182,212,0.07);border:1px solid rgba(6,182,212,0.35);border-radius:6px;color:#06b6d4;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Mono',monospace;letter-spacing:2px;transition:all 0.2s}
+.btn-auth:hover:not(:disabled){background:rgba(6,182,212,0.12);border-color:rgba(6,182,212,0.6);box-shadow:0 0 20px rgba(6,182,212,0.08)}
+.btn-auth:disabled{opacity:0.4;cursor:not-allowed}
+.auth-msg{font-family:'DM Mono',monospace;font-size:11px;text-align:center;margin-top:12px;min-height:18px}
+.auth-msg.err{color:#f87171}.auth-msg.ok{color:#4ade80}
+
+/* ── APP ── */
+#app-page{display:none}
+#app-page.show{display:block}
+
+/* ── OP BAR ── */
+#opbar{background:rgba(6,182,212,0.03);border-bottom:1px solid rgba(6,182,212,0.07);padding:9px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.op-id{font-family:'DM Mono',monospace;font-size:9px;color:rgba(6,182,212,0.35);letter-spacing:2px}
+.op-status{display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:9px;color:#334155;letter-spacing:1px}
+.blip{width:6px;height:6px;border-radius:50%;background:#06b6d4;animation:blipAnim 2s ease infinite}
+@keyframes blipAnim{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(6,182,212,0.4)}50%{opacity:0.5;box-shadow:0 0 0 4px rgba(6,182,212,0)}}
+.opbar-right{margin-left:auto;display:flex;gap:8px}
+.btn-op{background:transparent;border:1px solid rgba(6,182,212,0.12);border-radius:4px;padding:4px 12px;color:#334155;font-size:9px;cursor:pointer;font-family:'DM Mono',monospace;letter-spacing:1px;transition:all 0.18s}
+.btn-op:hover{border-color:rgba(6,182,212,0.35);color:#06b6d4}
+.btn-op.active{background:rgba(6,182,212,0.08);color:#06b6d4;border-color:rgba(6,182,212,0.3)}
+
+/* ── MAIN ── */
+#main{max-width:960px;margin:0 auto;padding:28px 20px 80px}
+.grid-bg-app{background-image:repeating-linear-gradient(rgba(6,182,212,0.015) 0 1px,transparent 1px 100%),repeating-linear-gradient(90deg,rgba(6,182,212,0.015) 0 1px,transparent 1px 100%);background-size:32px 32px;min-height:calc(100vh - 50px)}
+
+.sec-lbl{font-family:'DM Mono',monospace;font-size:9px;color:rgba(6,182,212,0.35);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.sec-lbl::after{content:"";flex:1;height:1px;background:rgba(6,182,212,0.05)}
+.sec-lbl .sn{color:rgba(6,182,212,0.15)}
+
+.op-header{margin-bottom:28px;position:relative}
+.op-eyebrow{font-family:'DM Mono',monospace;font-size:9px;color:rgba(6,182,212,0.35);letter-spacing:3px;margin-bottom:8px}
+.op-title{font-family:'Syne',sans-serif;font-size:clamp(26px,4vw,38px);font-weight:800;color:#e2e8f0;line-height:1.1;margin-bottom:8px}
+.op-title span{color:#06b6d4}
+.op-sub{font-family:'DM Mono',monospace;font-size:11px;color:#1e3340;line-height:1.7}
+
+/* target cards */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:8px;margin-bottom:24px}
+.tc{cursor:pointer;border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:14px 16px;transition:all 0.2s;background:rgba(255,255,255,0.01);user-select:none;position:relative;overflow:hidden}
+.tc::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:var(--c);opacity:0;transition:opacity 0.2s}
+.tc:hover{border-color:rgba(255,255,255,0.09);transform:translateY(-1px)}
+.tc.active{border-color:var(--c);background:color-mix(in srgb,var(--c) 6%,transparent)}
+.tc.active::before{opacity:1}
+.tc-icon{font-size:18px;margin-bottom:8px;filter:grayscale(1);transition:filter 0.2s}
+.tc.active .tc-icon{filter:none}
+.tc-lbl{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;margin-bottom:3px;color:#334155;transition:color 0.2s}
+.tc.active .tc-lbl{color:var(--c)}
+.tc-sub{font-family:'DM Mono',monospace;font-size:9px;color:#1e2d3d;line-height:1.5}
+
+/* mode pills */
+.mprow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.mp{cursor:pointer;border:1px solid rgba(255,255,255,0.07);border-radius:6px;padding:7px 14px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.8px;color:#1e3340;background:transparent;transition:all 0.18s;user-select:none}
+.mp:hover{border-color:rgba(6,182,212,0.25);color:#475569}
+.mp.active{border-color:#06b6d4;background:rgba(6,182,212,0.07);color:#06b6d4}
+.mp-hint{font-family:'DM Mono',monospace;font-size:10px;color:#1a2a33;margin:6px 0 20px;min-height:16px}
+
+/* lang */
+.lrow{display:flex;gap:6px;margin-bottom:24px}
+.lp{cursor:pointer;border:1px solid rgba(255,255,255,0.06);border-radius:20px;padding:5px 14px;font-family:'DM Mono',monospace;font-size:10px;color:#1e2d3d;background:transparent;transition:all 0.18s;user-select:none}
+.lp:hover{border-color:rgba(6,182,212,0.2);color:#475569}
+.lp.active{border-color:rgba(6,182,212,0.45);color:#06b6d4;background:rgba(6,182,212,0.05)}
+
+/* intercept zone */
+.iz{border:1px dashed rgba(6,182,212,0.18);border-radius:8px;padding:18px 20px;cursor:pointer;transition:all 0.2s;margin-bottom:10px;display:flex;align-items:center;gap:14px;position:relative;overflow:hidden}
+.iz::before{content:"";position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:conic-gradient(from var(--sweep-angle,0deg),transparent 340deg,rgba(6,182,212,0.04) 355deg,transparent 360deg);animation:izSweep 4s linear infinite;pointer-events:none}
+@property --sweep-angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes izSweep{to{--sweep-angle:360deg}}
+.iz:hover{border-color:rgba(6,182,212,0.35);background:rgba(6,182,212,0.02)}
+.iz.loaded{border-style:solid;border-color:rgba(6,182,212,0.28);background:rgba(6,182,212,0.03)}
+.iz-icon{font-size:22px;flex-shrink:0;position:relative;z-index:1}
+.iz-text{position:relative;z-index:1}
+.iz-title{font-size:12px;color:#1e3340;margin-bottom:2px;font-family:'DM Mono',monospace}
+.iz-sub{font-family:'DM Mono',monospace;font-size:9px;color:#0f2030}
+
+textarea{width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.07);border-radius:8px;color:#cbd5e1;padding:14px 16px;font-size:12px;font-family:'DM Mono',monospace;resize:vertical;min-height:140px;line-height:1.7;outline:none;transition:border-color 0.2s;caret-color:#06b6d4}
+textarea:focus{border-color:rgba(6,182,212,0.28);box-shadow:0 0 0 3px rgba(6,182,212,0.04)}
+textarea::placeholder{color:#0f1e28}
+.char-row{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9px;color:#0f1e28;margin-bottom:20px;margin-top:5px}
+
+.err-box{background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:6px;padding:10px 14px;color:#fca5a5;font-size:11px;font-family:'DM Mono',monospace;margin-bottom:14px;display:none}
+
+/* submit */
+.btn-submit{width:100%;padding:15px;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.35);border-radius:8px;color:#06b6d4;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Mono',monospace;letter-spacing:2.5px;transition:all 0.22s;position:relative;overflow:hidden}
+.btn-submit::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(6,182,212,0.04),transparent);transform:translateX(-100%);transition:transform 0.6s}
+.btn-submit:hover:not(:disabled)::after{transform:translateX(100%)}
+.btn-submit:hover:not(:disabled){background:rgba(6,182,212,0.11);border-color:rgba(6,182,212,0.6);box-shadow:0 0 28px rgba(6,182,212,0.1)}
+.btn-submit:disabled{opacity:0.4;cursor:not-allowed}
+@keyframes sigPulse{0%,100%{box-shadow:0 0 0 0 rgba(6,182,212,0.18)}50%{box-shadow:0 0 0 8px rgba(6,182,212,0)}}
+.btn-submit:not(:disabled){animation:sigPulse 2.5s ease infinite}
+
+/* result */
+#result-wrap{display:none}
+#result-wrap.show{display:block}
+.res-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;padding:14px 18px;background:rgba(6,182,212,0.03);border:1px solid rgba(6,182,212,0.08);border-radius:8px}
+.res-left{display:flex;align-items:center;gap:10px}
+.res-blip{width:8px;height:8px;border-radius:50%;background:#06b6d4;box-shadow:0 0 8px #06b6d4}
+.res-lbl{font-family:'DM Mono',monospace;font-size:9px;color:#06b6d4;letter-spacing:2px}
+.res-meta{font-family:'DM Mono',monospace;font-size:10px;color:#1e2d3d;margin-top:3px}
+.res-actions{display:flex;gap:6px;flex-wrap:wrap}
+.btn-act{background:transparent;border:1px solid rgba(255,255,255,0.07);border-radius:5px;padding:6px 14px;color:#334155;font-size:10px;cursor:pointer;font-family:'DM Mono',monospace;transition:all 0.18s}
+.btn-act:hover{border-color:rgba(6,182,212,0.28);color:#06b6d4}
+.btn-act.pri{color:#06b6d4;border-color:rgba(6,182,212,0.22)}
+#res-content{background:rgba(2,5,12,0.98);border:1px solid rgba(6,182,212,0.07);border-radius:10px;padding:24px 28px;max-height:70vh;overflow-y:auto;box-shadow:inset 0 1px 0 rgba(6,182,212,0.04)}
+.further-box{margin-top:12px;padding:12px 16px;background:rgba(6,182,212,0.02);border:1px solid rgba(6,182,212,0.06);border-radius:7px}
+.further-lbl{font-family:'DM Mono',monospace;font-size:9px;color:#1e2d3d;letter-spacing:1.5px;margin-bottom:8px}
+.further-row{display:flex;flex-wrap:wrap;gap:6px}
+
+/* history */
+#hist-panel{display:none;background:rgba(2,5,12,0.95);border:1px solid rgba(6,182,212,0.08);border-radius:10px;padding:16px;margin-bottom:22px}
+#hist-panel.show{display:block}
+.hi{cursor:pointer;border:1px solid rgba(255,255,255,0.05);border-radius:7px;padding:10px 14px;transition:all 0.18s;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.hi:hover{border-color:rgba(6,182,212,0.18);background:rgba(6,182,212,0.025)}
+.hbadge{font-family:'DM Mono',monospace;font-size:9px;padding:2px 8px;border-radius:3px;flex-shrink:0}
+.bc{background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.2)}
+.bh{background:rgba(234,88,12,0.15);color:#fb923c;border:1px solid rgba(234,88,12,0.2)}
+.bm{background:rgba(202,138,4,0.12);color:#facc15;border:1px solid rgba(202,138,4,0.2)}
+.bl{background:rgba(22,163,74,0.1);color:#4ade80;border:1px solid rgba(22,163,74,0.15)}
+.bn{background:rgba(6,182,212,0.08);color:#67e8f9;border:1px solid rgba(6,182,212,0.15)}
+
+/* MD */
+.md-h2{display:flex;align-items:center;gap:10px;margin:22px 0 10px;padding-bottom:7px;border-bottom:1px solid rgba(6,182,212,0.07)}
+.md-h2-bar{width:3px;height:15px;background:#06b6d4;border-radius:2px;flex-shrink:0}
+.md-h2-txt{color:#06b6d4;font-size:10px;font-weight:600;letter-spacing:2.5px;font-family:'DM Mono',monospace;text-transform:uppercase}
+.md-bb{background:rgba(6,182,212,0.03);border-left:2px solid rgba(6,182,212,0.28);padding:8px 12px;border-radius:0 6px 6px 0;margin:10px 0 4px}
+.md-bul{display:flex;gap:8px;padding:2px 0 2px 12px}
+.md-bul-d{color:rgba(6,182,212,0.38);flex-shrink:0;font-size:12px;margin-top:2px}
+.md-bul-t{color:#7a8a9a;font-size:13px;line-height:1.65}
+.md-num{display:flex;gap:10px;padding:3px 0 3px 8px}
+.md-num-n{color:#06b6d4;font-family:'DM Mono',monospace;font-size:11px;flex-shrink:0;margin-top:2px;min-width:18px}
+.md-p{color:#7a8a9a;font-size:13px;line-height:1.7;margin:4px 0}
+.md-tw{overflow-x:auto;margin:10px 0 14px}
+.md-t{width:100%;border-collapse:collapse;font-size:12px;font-family:'DM Mono',monospace}
+.md-t td{padding:7px 12px;border-bottom:1px solid rgba(6,182,212,0.05)}
+.md-t tr:first-child td{color:#06b6d4;font-weight:600;background:rgba(6,182,212,0.04);border-left:2px solid rgba(6,182,212,0.18)}
+.md-t tr:not(:first-child) td{color:#7a8a9a}
+.md-code{background:rgba(0,0,0,0.5);border:1px solid rgba(6,182,212,0.07);border-radius:6px;padding:12px 14px;margin:10px 0;font-family:'DM Mono',monospace;font-size:11px;color:#67e8f9;overflow-x:auto;line-height:1.7;white-space:pre}
+.md-ic{background:rgba(6,182,212,0.07);color:#06b6d4;padding:1px 6px;border-radius:3px;font-size:11px;font-family:'DM Mono',monospace}
+.md-str{color:#e2e8f0;font-weight:600}
+
+.footer{margin-top:48px;border-top:1px solid rgba(6,182,212,0.05);padding-top:16px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.fl{font-family:'DM Mono',monospace;font-size:9px;color:#0f1e28;letter-spacing:1.5px}
+.fr{font-family:'DM Mono',monospace;font-size:9px;color:rgba(6,182,212,0.2);letter-spacing:2px}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fu{animation:fadeUp 0.3s ease forwards}
+</style>
+</head>
+<body>
+
+<!-- ══ LOADING ══ -->
+<div id="ls">
+  <canvas id="ls-canvas"></canvas>
+  <div class="ls-ui">
+    <div class="ls-label">GHOST SIGNAL // STRIKERS_PROTOCOL</div>
+    <div class="ls-main" id="ls-main">SIGNAL ACQUISITION</div>
+    <div class="ls-status" id="ls-status">Initializing sensor array...</div>
+    <div class="ls-bar-wrap"><div class="ls-bar" id="ls-bar"></div></div>
+    <div class="ls-stats">
+      <div><div class="ls-stat-val" id="ls-freq">0</div><div class="ls-stat-lbl">FREQ MHz</div></div>
+      <div><div class="ls-stat-val" id="ls-sigs">0</div><div class="ls-stat-lbl">SIGNALS</div></div>
+      <div><div class="ls-stat-val" id="ls-lock">--</div><div class="ls-stat-lbl">LOCK</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TOPBAR ══ -->
+<div id="topbar">
+  <div class="logo-ring">GS</div>
+  <span class="logo-txt">GHOST <span>SIGNAL</span></span>
+  <div class="dv"></div>
+  <span class="tb-sub">STRIKERS_PROTOCOL</span>
+  <div class="tb-right">
+    <div class="signal-dot" id="sdot"></div>
+    <span class="tb-badge" id="tb-badge"></span>
+    <span class="tb-chip" id="tb-chip"></span>
+    <button class="btn-tb" id="btn-ops" onclick="toggleHistory()">OPS LOG</button>
+    <button class="btn-tb" id="btn-new" onclick="resetAll()">NEW OP</button>
+    <button class="btn-tb" id="btn-logout" onclick="logout()">LOGOUT</button>
+  </div>
+</div>
+
+<!-- ══ AUTH ══ -->
+<div id="auth-page">
+  <div class="auth-card">
+    <div class="auth-hdr">
+      <div class="auth-radar">
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:#06b6d4">GS</span>
+      </div>
+      <div class="auth-title">Ghost Signal</div>
+      <div class="auth-sub">STRIKERS_PROTOCOL // v2.0</div>
+    </div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tab-l" onclick="switchTab('l')">AUTHENTICATE</div>
+      <div class="auth-tab" id="tab-r" onclick="switchTab('r')">REGISTER</div>
+    </div>
+    <div id="form-l">
+      <div class="fld-lbl">OPERATOR ID</div>
+      <input type="text" id="lu" placeholder="username" autocomplete="username"/>
+      <div class="fld-lbl">CLEARANCE CODE</div>
+      <input type="password" id="lp" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <button class="btn-auth" id="btn-login" onclick="doLogin()">⟫ &nbsp; ESTABLISH SECURE LINK</button>
+    </div>
+    <div id="form-r" style="display:none">
+      <div class="fld-lbl">OPERATOR ID</div>
+      <input type="text" id="ru"/>
+      <div class="fld-lbl">CONTACT FREQUENCY</div>
+      <input type="email" id="re"/>
+      <div class="fld-lbl">CLEARANCE CODE</div>
+      <input type="password" id="rp" onkeydown="if(event.key==='Enter')doRegister()"/>
+      <button class="btn-auth" id="btn-reg" onclick="doRegister()">⟫ &nbsp; REQUEST ACCESS</button>
+    </div>
+    <div class="auth-msg" id="auth-msg"></div>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app-page">
+  <div id="opbar">
+    <span class="op-id" id="op-id">OP #—</span>
+    <div class="op-status"><div class="blip"></div><span id="op-status-txt">STANDING BY</span></div>
+    <div class="opbar-right">
+      <button class="btn-op active" id="ob-new" onclick="switchView('new')">NEW INTERCEPT</button>
+      <button class="btn-op" id="ob-hist" onclick="switchView('hist')">OPS LOG</button>
+    </div>
+  </div>
+
+  <div class="grid-bg-app">
+  <div id="main">
+
+    <div id="hist-panel">
+      <div class="sec-lbl"><span class="sn">◉</span>PREVIOUS OPERATIONS</div>
+      <div id="hist-list"></div>
+      <button class="btn-op" onclick="loadMore()" id="btn-load-more" style="display:none;margin-top:8px">Load more ops</button>
+    </div>
+
+    <div id="input-section" class="fu">
+      <div class="op-header">
+        <div class="op-eyebrow">ACTIVE INTERCEPT</div>
+        <h1 class="op-title">Acquire <span>Signal.</span></h1>
+        <p class="op-sub">Software · Firmware · Hardware · Code · Network Traffic<br>Upload target file or describe — AI will intercept and decode everything.</p>
+      </div>
+
+      <div class="sec-lbl"><span class="sn">01</span>TARGET CLASS</div>
+      <div class="tgrid" id="tgrid"></div>
+
+      <div class="sec-lbl"><span class="sn">02</span>INTERCEPT MODE</div>
+      <div class="mprow" id="mprow"></div>
+      <div class="mp-hint" id="mp-hint"></div>
+
+      <div class="sec-lbl"><span class="sn">03</span>FREQUENCY</div>
+      <div class="lrow" id="lrow"></div>
+
+      <div class="sec-lbl"><span class="sn">04</span>INTERCEPT ZONE</div>
+      <div class="iz" id="iz" onclick="document.getElementById('fi').click()">
+        <input type="file" id="fi" style="display:none" onchange="handleFile(event)"/>
+        <div class="iz-icon">📡</div>
+        <div class="iz-text">
+          <div class="iz-title" id="iz-title">SIGNAL DROP ZONE — upload target file or click to browse</div>
+          <div class="iz-sub" id="iz-sub">APK · EXE · BIN · HEX · ELF · PCAP · JPG · PNG · Any binary</div>
+        </div>
+      </div>
+
+      <textarea id="main-inp" placeholder="DESCRIBE TARGET:&#10;&#10;e.g. &quot;NodeMCU ESP8266, AMS1117 regulator, USB micro port, 30 GPIO pins&quot;&#10;or paste code, hex dump, network log, firmware strings...&#10;&#10;Backend runs full binary analysis on uploaded files." oninput="updateChars()"></textarea>
+      <div class="char-row"><span id="char-c">0 chars</span><span>full binary analysis on server — max 50MB</span></div>
+
+      <div class="err-box" id="err-box"></div>
+      <button class="btn-submit" id="btn-sub" onclick="analyze()">⟫ &nbsp; LOCK ON TARGET — INITIATE INTERCEPT</button>
+    </div>
+
+    <div id="result-wrap">
+      <div class="res-topbar fu">
+        <div class="res-left">
+          <div class="res-blip"></div>
+          <div>
+            <div class="res-lbl">SIGNAL DECODED — INTELLIGENCE ACQUIRED</div>
+            <div class="res-meta" id="res-meta"></div>
+          </div>
+        </div>
+        <div class="res-actions">
+          <button class="btn-act" onclick="copyRes()">⎘ Copy Intel</button>
+          <button class="btn-act" id="btn-pdf" onclick="dlPDF()">↓ Export PDF</button>
+          <button class="btn-act pri" onclick="resetAll()">+ New Intercept</button>
+        </div>
+      </div>
+      <div id="res-content" class="fu"></div>
+      <div class="further-box fu">
+        <div class="further-lbl">RE-INTERCEPT — SAME TARGET, DIFFERENT FREQUENCY</div>
+        <div class="further-row" id="further-row"></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="fl">FOR SECURITY RESEARCH & LEARNING ONLY</span>
+      <span class="fr">POWERED BY STRIKERS_PROTOCOL</span>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- ══ RADAR LOADING SCRIPT ══ -->
+<script>
+(function(){
+  const cv=document.getElementById('ls-canvas'),ctx=cv.getContext('2d');
+  let W,H; function rsz(){W=cv.width=cv.offsetWidth;H=cv.height=cv.offsetHeight;} rsz();window.addEventListener('resize',rsz);
+  const CY='#06b6d4',CYD='rgba(6,182,212,',CYF='rgba(103,232,249,';
+  let angle=0,trails=[],blips=[],particles=[],pct=0,done=false;
+  const CX=()=>W/2,CY2=()=>H/2-20,R=()=>Math.min(W,H)*0.28;
+
+  function spawnBlip(){
+    const a=Math.random()*Math.PI*2,r=R()*(0.2+Math.random()*0.75);
+    blips.push({x:CX()+Math.cos(a)*r,y:CY2()+Math.sin(a)*r,life:1,size:Math.random()*3+1,col:Math.random()>0.3?CY:'#67e8f9'});
+  }
+
+  const STATS=[
+    [0,"Initializing sensor array..."],
+    [8,"Calibrating frequency range..."],
+    [18,"Scanning electromagnetic spectrum..."],
+    [30,"Signal detected — 2.4GHz band..."],
+    [42,"Acquiring target lock..."],
+    [55,"Decrypting signal envelope..."],
+    [66,"Extracting payload signature..."],
+    [76,"Cross-referencing intelligence database..."],
+    [86,"Reconstructing transmission pattern..."],
+    [95,"Signal locked — generating report..."],
+  ];
+  const MAINS=[[0,"SIGNAL ACQUISITION"],[20,"SCANNING SPECTRUM"],[45,"TARGET ACQUIRED"],[70,"DECODING SIGNAL"],[90,"LOCKING ON TARGET"]];
+  let lS='',lM='',freqV=0,sigV=0;
+
+  function draw(){
+    if(done)return;
+    const elapsed=Date.now()-start;
+    pct=Math.min(elapsed/6500*100,99);
+    ctx.fillStyle='#060810';ctx.fillRect(0,0,W,H);
+    for(let y=0;y<H;y+=4){ctx.fillStyle='rgba(0,0,0,0.04)';ctx.fillRect(0,y,W,1);}
+
+    const cx=CX(),cy=CY2(),r=R();
+
+    // Rings
+    [1,0.75,0.5,0.25].forEach((f,i)=>{
+      ctx.beginPath();ctx.arc(cx,cy,r*f,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(6,182,212,${0.04+i*0.02})`;ctx.lineWidth=0.5;ctx.stroke();
+    });
+    // Cross hairs
+    ctx.strokeStyle='rgba(6,182,212,0.07)';ctx.lineWidth=0.5;
+    ctx.beginPath();ctx.moveTo(cx-r-10,cy);ctx.lineTo(cx+r+10,cy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx,cy-r-10);ctx.lineTo(cx,cy+r+10);ctx.stroke();
+
+    // Sweep trail
+    trails.push({angle,alpha:0.18});
+    if(trails.length>90)trails.shift();
+    trails.forEach((t,i)=>{
+      const a=t.angle,prev=trails[Math.max(0,i-1)].angle;
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy,r,prev,a,false);
+      ctx.closePath();
+      ctx.fillStyle=`rgba(6,182,212,${t.alpha*(i/trails.length)*0.6})`;
+      ctx.fill();
+    });
+
+    // Sweep line
+    const ex=cx+Math.cos(angle)*r,ey=cy+Math.sin(angle)*r;
+    const grad=ctx.createLinearGradient(cx,cy,ex,ey);
+    grad.addColorStop(0,'rgba(6,182,212,0)');
+    grad.addColorStop(1,'rgba(6,182,212,0.7)');
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(ex,ey);
+    ctx.strokeStyle=grad;ctx.lineWidth=1.5;ctx.stroke();
+
+    // Center dot
+    ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);
+    ctx.fillStyle='#06b6d4';ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,6,0,Math.PI*2);
+    ctx.strokeStyle='rgba(6,182,212,0.3)';ctx.lineWidth=1;ctx.stroke();
+
+    angle+=0.025;
+
+    // Spawn blips near sweep
+    if(Math.random()<0.06)spawnBlip();
+
+    // Draw blips
+    blips=blips.filter(b=>b.life>0.02);
+    blips.forEach(b=>{
+      b.life-=0.012;
+      ctx.beginPath();ctx.arc(b.x,b.y,b.size*b.life,0,Math.PI*2);
+      ctx.fillStyle=b.col.replace(')',`,${b.life})`).replace('rgba(','').includes('rgba')?b.col:`rgba(6,182,212,${b.life})`;
+      ctx.fill();
+      ctx.beginPath();ctx.arc(b.x,b.y,b.size*2*b.life,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(6,182,212,${b.life*0.3})`;ctx.lineWidth=0.5;ctx.stroke();
+    });
+
+    // Tick marks
+    for(let i=0;i<36;i++){
+      const a=i*(Math.PI*2/36),len=i%9===0?10:5;
+      ctx.beginPath();
+      ctx.moveTo(cx+Math.cos(a)*(r-2),cy+Math.sin(a)*(r-2));
+      ctx.lineTo(cx+Math.cos(a)*(r-len),cy+Math.sin(a)*(r-len));
+      ctx.strokeStyle='rgba(6,182,212,0.2)';ctx.lineWidth=0.5;ctx.stroke();
+    }
+
+    // Corner brackets
+    [[40,30,1,1],[W-40,30,-1,1],[40,H-30,1,-1],[W-40,H-30,-1,-1]].forEach(([bx,by,dx,dy])=>{
+      ctx.save();ctx.strokeStyle='rgba(6,182,212,0.25)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(bx+dx*16,by);ctx.lineTo(bx,by);ctx.lineTo(bx,by+dy*16);ctx.stroke();ctx.restore();
+    });
+
+    // Side freq lines
+    [30,50,70].forEach((x,i)=>{
+      const t=((elapsed*0.0004+i*0.6)%1);
+      ctx.save();ctx.globalAlpha=0.1;ctx.strokeStyle=CY;ctx.lineWidth=0.8;
+      ctx.beginPath();ctx.moveTo(x,H*0.2);ctx.lineTo(x,H*0.8);ctx.stroke();
+      ctx.globalAlpha=0.45;ctx.fillStyle=CY;ctx.fillRect(x-2,H*0.2+t*(H*0.6)-4,4,8);ctx.restore();
+    });
+    [W-30,W-50,W-70].forEach((x,i)=>{
+      const t=((elapsed*0.0004+i*0.4+0.5)%1);
+      ctx.save();ctx.globalAlpha=0.1;ctx.strokeStyle=CY;ctx.lineWidth=0.8;
+      ctx.beginPath();ctx.moveTo(x,H*0.2);ctx.lineTo(x,H*0.8);ctx.stroke();
+      ctx.globalAlpha=0.45;ctx.fillStyle=CY;ctx.fillRect(x-2,H*0.2+t*(H*0.6)-4,4,8);ctx.restore();
+    });
+
+    document.getElementById('ls-bar').style.width=pct+'%';
+    const s=STATS.filter(x=>x[0]<=pct).pop();
+    if(s&&s[1]!==lS){document.getElementById('ls-status').textContent=s[1];lS=s[1];}
+    const m=MAINS.filter(x=>x[0]<=pct).pop();
+    if(m&&m[1]!==lM){document.getElementById('ls-main').textContent=m[1];lM=m[1];}
+
+    freqV=Math.min(2400,freqV+38+Math.random()*20);
+    sigV=Math.min(99,sigV+Math.random()*1.2);
+    document.getElementById('ls-freq').textContent=Math.round(freqV);
+    document.getElementById('ls-sigs').textContent=Math.round(sigV);
+    if(pct>60)document.getElementById('ls-lock').textContent=Math.round((pct-60)*2.5)+'%';
+
+    if(pct>=99){
+      ctx.fillStyle='rgba(6,182,212,0.03)';ctx.fillRect(0,0,W,H);
+      setTimeout(function(){done=true;document.getElementById('ls').classList.add('hidden');autoLogin();},500);
+      return;
+    }
+    requestAnimationFrame(draw);
+  }
+  const start=Date.now();
+  draw();
+})();
+</script>
+
+<!-- ══ APP SCRIPT ══ -->
+<script>
+const API='';
+const TARGETS=[
+  {id:'software',icon:'💾',label:'Software / App',   sub:'APK · EXE · DLL · SO',         color:'#06b6d4'},
+  {id:'firmware',icon:'📡',label:'Firmware / IoT',   sub:'BIN · HEX · Flipper · Arduino', color:'#22d3ee'},
+  {id:'hardware',icon:'🔌',label:'Hardware',         sub:'PCB · Chip · HDD · Keyboard',   color:'#67e8f9'},
+  {id:'code',    icon:'📄',label:'Source Code',      sub:'Any language · snippet',         color:'#a5f3fc'},
+  {id:'network', icon:'🌐',label:'Network / Protocol',sub:'PCAP · Packets · Hex',         color:'#cffafe'},
+];
+const MODES=[
+  {id:'full',      g:'◈',label:'FULL INTERCEPT',   hint:'Complete breakdown — components, logic, vulnerabilities, design'},
+  {id:'components',g:'◉',label:'COMPONENTS',       hint:'Every chip, library, protocol, algorithm identified'},
+  {id:'logic',     g:'⟳',label:'LOGIC & FLOW',     hint:'Step-by-step internal execution — how it really works'},
+  {id:'security',  g:'⚑',label:'STEALTH SCAN',     hint:'All vulnerabilities, attack surfaces, weak points'},
+  {id:'bugs',      g:'⊘',label:'SIGNAL NOISE',     hint:'Root cause of errors — why it broke and how to fix'},
+];
+const LANGS=[{id:'hinglish',label:'हिं + EN'},{id:'english',label:'English'},{id:'hindi',label:'हिंदी'}];
+let S={t:'software',m:'full',l:'hinglish',tok:'',usr:'',uid:0,file:null,aid:null,res:null,ho:0,opN:Math.floor(Math.random()*9000)+1000};
+
+function init(){rTgt();rMode();rLang();}
+
+function rTgt(){document.getElementById('tgrid').innerHTML=TARGETS.map(function(t){return '<div class="tc '+(S.t===t.id?'active':'')+'" style="--c:'+t.color+'" onclick="selT(\''+t.id+'\')"><div class="tc-icon">'+t.icon+'</div><div class="tc-lbl">'+t.label+'</div><div class="tc-sub">'+t.sub+'</div></div>';}).join('');}
+function rMode(){document.getElementById('mprow').innerHTML=MODES.map(function(m){return '<div class="mp '+(S.m===m.id?'active':'')+'" onclick="selM(\''+m.id+'\')">'+m.g+' '+m.label+'</div>';}).join('');var c=MODES.filter(function(m){return m.id===S.m;})[0];document.getElementById('mp-hint').textContent='› '+(c?c.hint:'');}
+function rLang(){document.getElementById('lrow').innerHTML=LANGS.map(function(l){return '<div class="lp '+(S.l===l.id?'active':'')+'" onclick="selL(\''+l.id+'\')">'+l.label+'</div>';}).join('');}
+function selT(id){S.t=id;rTgt();}function selM(id){S.m=id;rMode();}function selL(id){S.l=id;rLang();}
+
+function switchTab(t){
+  document.getElementById('tab-l').classList.toggle('active',t==='l');
+  document.getElementById('tab-r').classList.toggle('active',t==='r');
+  document.getElementById('form-l').style.display=t==='l'?'block':'none';
+  document.getElementById('form-r').style.display=t==='r'?'block':'none';
+  document.getElementById('auth-msg').textContent='';
+}
+
+function doLogin(){
+  var u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value;
+  if(!u||!p){setAM('Operator ID and clearance code required','err');return;}
+  var btn=document.getElementById('btn-login');btn.disabled=true;btn.textContent='AUTHENTICATING...';
+  fetch(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
+    .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+    .then(function(res){if(!res.ok){setAM(res.d.detail||'Authentication failed','err');return;}onLogin(res.d);})
+    .catch(function(e){setAM('Server unreachable: '+e.message,'err');})
+    .finally(function(){btn.disabled=false;btn.textContent='⟫  ESTABLISH SECURE LINK';});
+}
+
+function doRegister(){
+  var u=document.getElementById('ru').value.trim(),e=document.getElementById('re').value.trim(),p=document.getElementById('rp').value;
+  if(!u||!e||!p){setAM('All fields required','err');return;}
+  var btn=document.getElementById('btn-reg');btn.disabled=true;btn.textContent='REQUESTING ACCESS...';
+  fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,email:e,password:p})})
+    .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+    .then(function(res){if(!res.ok){setAM(res.d.detail||'Registration failed','err');return;}setAM('Access granted! Linking...','ok');setTimeout(function(){onLogin(res.d);},600);})
+    .catch(function(e){setAM('Server unreachable: '+e.message,'err');})
+    .finally(function(){btn.disabled=false;btn.textContent='⟫  REQUEST ACCESS';});
+}
+
+function onLogin(d){
+  S.tok=d.access_token;S.usr=d.username;S.uid=d.user_id;
+  localStorage.setItem('gs_tok',d.access_token);localStorage.setItem('gs_usr',d.username);localStorage.setItem('gs_uid',d.user_id);
+  document.getElementById('auth-page').classList.remove('show');
+  document.getElementById('app-page').classList.add('show');
+  document.getElementById('tb-chip').textContent='OPERATOR: '+d.username.toUpperCase();
+  document.getElementById('tb-chip').classList.add('show');
+  document.getElementById('sdot').classList.add('show');
+  ['btn-ops','btn-new','btn-logout'].forEach(function(id){document.getElementById(id).classList.add('show');});
+  document.getElementById('op-id').textContent='OP #'+String(S.opN).padStart(4,'0');
+  init();loadHist();
+}
+
+function logout(){
+  S.tok='';localStorage.removeItem('gs_tok');localStorage.removeItem('gs_usr');localStorage.removeItem('gs_uid');
+  document.getElementById('app-page').classList.remove('show');
+  document.getElementById('auth-page').classList.add('show');
+  document.getElementById('tb-chip').classList.remove('show');
+  document.getElementById('sdot').classList.remove('show');
+  ['btn-ops','btn-new','btn-logout'].forEach(function(id){document.getElementById(id).classList.remove('show');});
+}
+
+function autoLogin(){
+  var t=localStorage.getItem('gs_tok'),u=localStorage.getItem('gs_usr'),id=localStorage.getItem('gs_uid');
+  if(t&&u){onLogin({access_token:t,username:u,user_id:parseInt(id||0)});}
+  else{document.getElementById('auth-page').classList.add('show');}
+}
+
+function switchView(v){
+  document.getElementById('ob-new').classList.toggle('active',v==='new');
+  document.getElementById('ob-hist').classList.toggle('active',v==='hist');
+  document.getElementById('hist-panel').classList.toggle('show',v==='hist');
+  if(v==='hist')loadHist();
+}
+
+function handleFile(e){
+  var f=e.target.files[0];if(!f)return;
+  S.file=f;
+  document.getElementById('iz').classList.add('loaded');
+  document.getElementById('iz-title').innerHTML='<span style="color:#06b6d4;font-family:\'DM Mono\',monospace">📎 '+f.name+'</span>';
+  document.getElementById('iz-sub').textContent=(f.size/1024).toFixed(1)+' KB — click to change';
+  updateChars();
+}
+
+function updateChars(){
+  var t=document.getElementById('main-inp').value.length,f=S.file?S.file.size:0;
+  var s=t>0?(t+' chars'):'';if(f>0)s+=(s?' + ':'')+(f/1024).toFixed(1)+' KB file';
+  document.getElementById('char-c').textContent=s||'0 chars';
+}
+
+function analyze(){
+  var text=document.getElementById('main-inp').value.trim();
+  if(!text&&!S.file){showErr('Target required — upload file or describe target.');return;}
+  hideErr();
+  var btn=document.getElementById('btn-sub');
+  btn.disabled=true;btn.textContent='INTERCEPTING SIGNAL — PLEASE WAIT...';
+  document.getElementById('op-status-txt').textContent='INTERCEPT IN PROGRESS';
+  var fd=new FormData();
+  fd.append('target_type',S.t);fd.append('analysis_mode',S.m);
+  fd.append('language',S.l);fd.append('input_text',text);
+  fd.append('title',S.file?S.file.name:text.slice(0,60));
+  if(S.file)fd.append('file',S.file);
+  fetch(API+'/api/analysis/run',{method:'POST',headers:{'Authorization':'Bearer '+S.tok},body:fd})
+    .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+    .then(function(res){
+      if(!res.ok)throw new Error(res.d.detail||'Intercept failed');
+      var d=res.d;S.res=d;S.aid=d.id;S.opN++;
+      document.getElementById('op-id').textContent='OP #'+String(S.opN).padStart(4,'0');
+      showThreat(d.risk_level);showResult(d);loadHist();
+    })
+    .catch(function(e){showErr('Error: '+e.message);})
+    .finally(function(){btn.disabled=false;btn.textContent='⟫  LOCK ON TARGET — INITIATE INTERCEPT';document.getElementById('op-status-txt').textContent='STANDING BY';});
+}
+
+function showThreat(r){
+  var el=document.getElementById('tb-badge');
+  var map={Critical:'THREAT: CRITICAL',High:'THREAT: HIGH',Medium:'THREAT: MEDIUM',Low:'THREAT: LOW',None:'SIGNAL: CLEAN',Unknown:'THREAT: ?'};
+  var cls={Critical:'threat-C',High:'threat-H',Medium:'threat-M',Low:'threat-L',None:'threat-N',Unknown:'threat-N'};
+  el.textContent=map[r]||r;el.className='tb-badge '+(cls[r]||'threat-N');el.classList.add('show');
+}
+
+function showResult(d){
+  document.getElementById('input-section').style.display='none';
+  document.getElementById('result-wrap').classList.add('show');
+  var tl=(TARGETS.filter(function(t){return t.id===d.target_type;})[0]||{}).label||d.target_type;
+  document.getElementById('res-meta').textContent=tl+' · '+d.analysis_mode.toUpperCase()+' · '+(d.file_name||'manual input')+' · '+d.risk_level+' · '+d.confidence+'% conf · '+d.duration_ms+'ms';
+  document.getElementById('res-content').innerHTML=renderMD(d.result_md);
+  document.getElementById('further-row').innerHTML=MODES.filter(function(m){return m.id!==S.m;}).map(function(m){return '<button class="btn-act" onclick="switchMode(\''+m.id+'\')">'+m.g+' '+m.label+'</button>';}).join('');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function switchMode(id){
+  S.m=id;document.getElementById('result-wrap').classList.remove('show');
+  document.getElementById('input-section').style.display='block';rMode();window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function resetAll(){
+  S.res=null;S.file=null;S.aid=null;
+  document.getElementById('main-inp').value='';document.getElementById('fi').value='';
+  document.getElementById('iz').classList.remove('loaded');
+  document.getElementById('iz-title').textContent='SIGNAL DROP ZONE — upload target file or click to browse';
+  document.getElementById('iz-sub').textContent='APK · EXE · BIN · HEX · ELF · PCAP · JPG · PNG · Any binary';
+  updateChars();hideErr();
+  document.getElementById('result-wrap').classList.remove('show');
+  document.getElementById('input-section').style.display='block';
+  document.getElementById('op-status-txt').textContent='STANDING BY';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function toggleHistory(){switchView(document.getElementById('hist-panel').classList.contains('show')?'new':'hist');}
+
+function loadHist(offset){
+  offset=offset||0;if(!S.tok)return;
+  fetch(API+'/api/analysis/history?limit=10&offset='+offset,{headers:{'Authorization':'Bearer '+S.tok}})
+    .then(function(r){return r.json();})
+    .then(function(list){
+      if(!Array.isArray(list))return;
+      if(offset===0)document.getElementById('hist-list').innerHTML='';
+      var RMAP={Critical:{cls:'bc',l:'CRITICAL'},High:{cls:'bh',l:'HIGH'},Medium:{cls:'bm',l:'MEDIUM'},Low:{cls:'bl',l:'LOW'},None:{cls:'bn',l:'CLEAN'}};
+      list.forEach(function(h){
+        var b=RMAP[h.risk_level]||{cls:'bn',l:h.risk_level||'?'};
+        var tl=(TARGETS.filter(function(t){return t.id===h.target_type;})[0]||{}).label||h.target_type;
+        var row=document.createElement('div');row.className='hi';
+        row.innerHTML='<div style="min-width:0"><div style="font-family:\'DM Mono\',monospace;font-size:11px;color:#22d3ee;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(h.file_name||h.title)+'</div><div style="font-family:\'DM Mono\',monospace;font-size:9px;color:#1e2d3d">'+tl+' · '+h.analysis_mode.toUpperCase()+' · '+new Date(h.created_at).toLocaleDateString()+'</div></div><span class="hbadge '+b.cls+'">'+b.l+'</span>';
+        row.onclick=function(){loadCase(h.id);};
+        document.getElementById('hist-list').appendChild(row);
+      });
+      document.getElementById('btn-load-more').style.display=list.length===10?'block':'none';
+      S.ho=offset+list.length;
+    }).catch(function(){});
+}
+function loadMore(){loadHist(S.ho);}
+
+function loadCase(id){
+  fetch(API+'/api/analysis/'+id,{headers:{'Authorization':'Bearer '+S.tok}})
+    .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+    .then(function(res){if(!res.ok)return;var d=res.d;S.res=d;S.aid=d.id;S.m=d.analysis_mode;S.t=d.target_type;switchView('new');showThreat(d.risk_level);showResult(d);})
+    .catch(function(){});
+}
+
+function dlPDF(){
+  if(!S.aid)return;var btn=document.getElementById('btn-pdf');btn.disabled=true;btn.textContent='Generating...';
+  fetch(API+'/api/analysis/'+S.aid+'/pdf',{headers:{'Authorization':'Bearer '+S.tok}})
+    .then(function(r){if(!r.ok)throw new Error('PDF failed');return r.blob();})
+    .then(function(b){var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='ghost-signal-report-'+String(S.aid).padStart(6,'0')+'.pdf';a.click();})
+    .catch(function(e){showErr('PDF error: '+e.message);})
+    .finally(function(){btn.disabled=false;btn.textContent='↓ Export PDF';});
+}
+
+function copyRes(){
+  if(!S.res)return;
+  navigator.clipboard.writeText(S.res.result_md||'').then(function(){var b=event.target;b.textContent='✓ Copied!';setTimeout(function(){b.textContent='⎘ Copy Intel';},2000);});
+}
+
+function showErr(m){var e=document.getElementById('err-box');e.style.display='block';e.textContent='⚠ '+m;}
+function hideErr(){document.getElementById('err-box').style.display='none';}
+function setAM(m,t){var e=document.getElementById('auth-msg');e.textContent=m;e.className='auth-msg '+(t||'');}
+
+function renderMD(text){
+  if(!text)return'';
+  var lines=text.split('\n'),html='',trows=[],inT=false,clines=[],inC=false;
+  var esc=function(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+  var inl=function(t){return esc(t).replace(/\*\*(.*?)\*\*/g,'<strong class="md-str">$1</strong>').replace(/`(.*?)`/g,'<code class="md-ic">$1</code>').replace(/\*(.*?)\*/g,'<em style="color:#64748b">$1</em>');};
+  var fT=function(){if(!trows.length)return;var rows=trows.filter(function(r){return !r.match(/^[\s|:\-]+$/);});html+='<div class="md-tw"><table class="md-t">';rows.forEach(function(row){var cells=row.split('|').map(function(c){return c.trim();}).filter(Boolean);html+='<tr>'+cells.map(function(c){return '<td>'+inl(c)+'</td>';}).join('')+'</tr>';});html+='</table></div>';trows=[];inT=false;};
+  var fC=function(){if(!clines.length)return;html+='<div class="md-code">'+clines.map(esc).join('\n')+'</div>';clines=[];inC=false;};
+  lines.forEach(function(line){
+    if(line.startsWith('```')){inC?fC():(fT(),inC=true);return;}
+    if(inC){clines.push(line);return;}
+    if(line.startsWith('| ')){inT=true;trows.push(line);return;}
+    if(inT)fT();
+    if(line.startsWith('## '))html+='<div class="md-h2"><div class="md-h2-bar"></div><div class="md-h2-txt">'+esc(line.slice(3))+'</div></div>';
+    else if(line.match(/^\*\*\[.*?\]\*\*/))html+='<div class="md-bb">'+inl(line)+'</div>';
+    else if(line.match(/^[—\-•] /))html+='<div class="md-bul"><span class="md-bul-d">▸</span><span class="md-bul-t">'+inl(line.replace(/^[—\-•] /,''))+'</span></div>';
+    else if(/^\d+\./.test(line)){var n=line.match(/^(\d+)/)[1];html+='<div class="md-num"><span class="md-num-n">'+n+'.</span><span class="md-bul-t">'+inl(line.replace(/^\d+\.\s*/,''))+'</span></div>';}
+    else if(line.trim())html+='<p class="md-p">'+inl(line)+'</p>';
+    else html+='<div style="height:6px"></div>';
+  });
+  fT();fC();return html;
+}
+</script>
+</body>
+</html>
